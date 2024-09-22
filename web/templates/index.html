@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tama-Kiisu</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #0F0;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        #game-container {
+            text-align: center;
+            padding: 20px;
+            border: 2px solid #0F0;
+            box-shadow: 0 0 10px #0F0, 0 0 20px #0F0, 0 0 30px #0F0;
+            animation: flicker 0.15s infinite;
+        }
+        #cat-ascii {
+            font-size: 12px;
+            line-height: 1;
+            white-space: pre;
+            margin-bottom: 20px;
+        }
+        #stats {
+            margin: 20px 0;
+            text-align: left;
+        }
+        #command-input {
+            background-color: #000;
+            color: #0F0;
+            border: 1px solid #0F0;
+            padding: 5px;
+            width: 200px;
+        }
+        button {
+            background-color: #0F0;
+            color: #000;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        #command-help {
+            text-align: left;
+            margin-top: 20px;
+            font-size: 0.8em;
+        }
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            50% { opacity: 1; }
+            100% { opacity: 0.98; }
+        }
+        .crt::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: rgba(18, 16, 16, 0.1);
+            opacity: 0;
+            z-index: 2;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+        }
+        .crt::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="crt">
+    <div id="game-container">
+        <pre id="cat-ascii"></pre>
+        <div id="stats">
+            <p>Happiness: <span id="happiness">{{ .cat.Happiness }}</span></p>
+            <p>Fullness: <span id="fullness">{{ .cat.Fullness }}</span></p>
+            <p>Health: <span id="health">{{ .cat.Health }}</span></p>
+        </div>
+        <input type="text" id="command-input" placeholder="Enter command">
+        <button onclick="sendCommand()">Send</button>
+        <div id="command-help">
+            <p>Available commands:</p>
+            <ul>
+                <li>/givefood - Feed your cat</li>
+                <li>/givefun - Play with your cat</li>
+                <li>/givehealth - Take care of your cat's health</li>
+            </ul>
+        </div>
+        <div id="notification" style="color: red; margin-top: 10px;"></div>
+    </div>
+    <script>
+        const catFrames = [
+            [
+                "   /\\_____/\\   ",
+                "  /  o   o  \\  ",
+                " ( ==  ^  == ) ",
+                "  )         (  ",
+                " (           ) ",
+                " ( (  )   (  ) ",
+                "(__(__)___(__))"
+            ],
+            [
+                "   /\\_____/\\   ",
+                "  /  o   o  \\  ",
+                " ( >   ^   < ) ",
+                "  )         (  ",
+                " (           ) ",
+                " ( (  )   (  ) ",
+                "(__(__)___(__))"
+            ]
+        ];
+
+        const sleepingCatFrames = [
+            [
+                "   /\\_____/\\   ",
+                "  /  -   -  \\  ",
+                " ( ==  w  == ) ",
+                "  )  zZzZz  (  ",
+                " (           ) ",
+                " ( (  )   (  ) ",
+                "(__(__)___(__))"
+            ],
+            [
+                "   /\\_____/\\   ",
+                "  /  -   -  \\  ",
+                " ( ==  w  == ) ",
+                "  ) zZzZzZ  (  ",
+                " (           ) ",
+                " ( (  )   (  ) ",
+                "(__(__)___(__))"
+            ]
+        ];
+
+        let currentFrame = 0;
+
+        function updateCat() {
+            const happiness = parseInt(document.getElementById('happiness').textContent);
+            const fullness = parseInt(document.getElementById('fullness').textContent);
+            const health = parseInt(document.getElementById('health').textContent);
+
+            const catElement = document.getElementById('cat-ascii');
+            
+            if (happiness === 0 && fullness === 0 && health === 0) {
+                catElement.textContent = sleepingCatFrames[currentFrame].join('\n');
+            } else {
+                catElement.textContent = catFrames[currentFrame].join('\n');
+            }
+
+            currentFrame = (currentFrame + 1) % 2;
+        }
+
+        function animateCat() {
+            updateCat();
+            setTimeout(animateCat, 500);
+        }
+
+        function sendCommand() {
+        const command = document.getElementById('command-input').value;
+        fetch('/action', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=${command}`
+        })
+        .then(response => {
+            if (response.status === 429) {
+                document.getElementById('notification').textContent = 'Rate limit exceeded for this action. Try again in an hour.';
+                throw new Error('Rate limit exceeded');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                document.getElementById('notification').textContent = data.error;
+            } else {
+                document.getElementById('happiness').textContent = data.happiness;
+                document.getElementById('fullness').textContent = data.fullness;
+                document.getElementById('health').textContent = data.health;
+                document.getElementById('notification').textContent = '';
+            }
+        })
+        .catch(error => {
+            if (error.message !== 'Rate limit exceeded') {
+                console.error('Error:', error);
+            }
+        });
+    }
+
+        document.addEventListener('DOMContentLoaded', animateCat);
+    </script>
+</body>
+</html>
